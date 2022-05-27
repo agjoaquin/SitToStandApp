@@ -172,11 +172,6 @@ with mp_pose.Pose(static_image_mode=False) as pose:
 # Guardo los angulos medidos
 V_ang_and_vel = np.stack((V_angles_knee[:-2], V_vel_angles_knee, V_time[:-2]), axis=1)
 data_path = video_path[0:len(video_path)-len("Videos/")]+"Datos/"
-
-
-
-print(data_path)
-print(video_file_name)
 with open(data_path+'datos_ang_' + video_file_name + '.csv', 'wb') as h:
     np.savetxt(h, V_ang_and_vel, delimiter=',', fmt='%0.3f', header="Ang (º),Vel (º/s),Time (s)")
 
