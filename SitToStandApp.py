@@ -8,6 +8,29 @@ from math import acos, degrees
 from tkinter import Tk     
 from tkinter.filedialog import askopenfilename
 
+def filter_u_EMA(stack_ini, alfa):
+    stack_filter = np.zeros(0)
+    while (np.size(stack_filter)<np.size(stack_ini)):
+        if(np.size(stack_filter)<2):
+            stack_filter = np.append(stack_filter,stack_ini[np.size(stack_filter)])
+        else:
+            stack_filter = np.append(stack_filter,
+            alfa * stack_ini[np.size(stack_filter)-1] + (1-alfa)*stack_filter[np.size(stack_filter)-2])
+    return stack_filter
+
+def derivate_stack(stack_ini, delta_t):
+    stack_der = np.zeros(0)
+    while (np.size(stack_der)<np.size(stack_ini)):
+        if(np.size(stack_der)<2):
+            stack_der = np.append(stack_der,0)
+        else:
+            stack_der = np.append(stack_der,
+            (stack_ini[np.size(stack_der)-1] - stack_ini[np.size(stack_der)-2]) / delta_t) 
+        #print(str((stack_ini[np.size(stack_der)-1] - stack_ini[np.size(stack_der)-2] ) / delta_t))
+    return stack_der
+
+
+
 mp_drawing = mp.solutions.drawing_utils
 mp_pose = mp.solutions.pose
 
@@ -67,8 +90,8 @@ outVideoWriter = cv2.VideoWriter(video_file_result, fourcc, FPS_result, resoluti
 # Vector de angulos de la rodilla (knee)
 V_angles_knee = np.zeros(0)
 V_vel_angles_knee = np.zeros(0)
-V_angles_knee_f = np.zeros(0)
-V_vel_angles_knee_f = np.zeros(0)
+#V_angles_knee_filter = np.zeros(0)
+#V_vel_angles_knee_filter = np.zeros(0)
 alfa = 0.1
 # Vector de tiempos para cada frame
 V_time = np.zeros(0)
@@ -127,16 +150,25 @@ with mp_pose.Pose(static_image_mode=False) as pose:
             angle = degrees(acos((l1**2 + l3**2 - l2**2) / (2 * l1 * l3)))
             
             V_angles_knee = np.append(V_angles_knee, angle)
-            
-            vel_angles_knee = 0
 
+#            if (np.size(V_angles_knee)<=2):
+#                V_angles_knee_filter = np.append(V_angles_knee_filter, angle)
+
+#            vel_angles_knee = 0
             # Calcular la velocidad angular y lo agrego a V_vel_angles_knee
-            if (np.size(V_angles_knee) > 2):
-                angles_count = np.size(V_angles_knee)
-                vel_angles_knee = ( V_angles_knee[angles_count-1] - V_angles_knee[angles_count-2] ) / delta_t
-                V_vel_angles_knee = np.append(V_vel_angles_knee, vel_angles_knee)
+#            if (np.size(V_angles_knee) > 2):
+#                angles_count = np.size(V_angles_knee)
+#                V_angles_knee_filter = np.append(V_angles_knee_filter, 
+#                alfa * angle + (1-alfa)* V_angles_knee_filter[angles_count-2])
 
-
+#                vel_angles_knee = ( V_angles_knee[angles_count-1] - V_angles_knee[angles_count-2] ) / delta_t
+#                V_vel_angles_knee = np.append(V_vel_angles_knee, vel_angles_knee)
+#                if(np.size(V_vel_angles_knee_filter)<2):
+#                    V_vel_angles_knee_filter = np.append(V_vel_angles_knee_filter, 19)
+#                else:
+#                    V_vel_angles_knee_filter = np.append(V_vel_angles_knee_filter, 
+#                    alfa * vel_angles_knee + (1-alfa)* V_vel_angles_knee_filter[np.size(V_vel_angles_knee_filter)-2])
+               
             # Visualización de segmentos de muslo y pierna
             aux_image = np.zeros(resized_frame.shape, np.uint8)
 
@@ -155,7 +187,7 @@ with mp_pose.Pose(static_image_mode=False) as pose:
             cv2.putText(output, str(int(angle)), (x2, y2 - 30), 1, 1.5, (128, 0, 250), 2)   # Agrego el angulo en el video
             cv2.putText(output, "Angulo en grados,", (10, height - 40), 4, 0.75, (20, 20, 20), 2) # Agrego info en el video
             cv2.putText(output, "Pulse ESPACIO para finalizar.", (10, height - 10), 4, 0.75, (20, 20, 20), 2) # Agrego info en el video
-            cv2.putText(output, "Velocidad : "+str(round(vel_angles_knee,2)) + " grad/s", (10, height - 70), 4, 0.75, (20, 20, 20), 2) # Agrego info en el video
+            #cv2.putText(output, "Velocidad : "+str(round(vel_angles_knee,2)) + " grad/s", (10, height - 70), 4, 0.75, (20, 20, 20), 2) # Agrego info en el video
             
             # Guardado del video resultante
             outVideoWriter.write(output)
@@ -170,11 +202,27 @@ with mp_pose.Pose(static_image_mode=False) as pose:
 
 
 # Guardo los angulos medidos
-V_ang_and_vel = np.stack((V_angles_knee[:-2], V_vel_angles_knee, V_time[:-2]), axis=1)
+
+V_angles_knee_filter = filter_u_EMA(V_angles_knee,alfa) #Filtro lo ang
+V_vel_angles_knee = derivate_stack(V_angles_knee_filter,delta_t) #Calculo la velocidad con el ang filtrado
+V_vel_angles_knee_filter = filter_u_EMA(V_vel_angles_knee,alfa) #Filtro la vel
+print(np.size(V_time))
+print(np.size(V_angles_knee_filter))
+print(np.size(V_vel_angles_knee))
+#print(np.size(V_vel_angles_knee_filter))
+
+V_ang_and_vel = np.stack((V_angles_knee_filter[:-2], V_vel_angles_knee_filter[:-2], V_time[:-2]),1)
 data_path = video_path[0:len(video_path)-len("Videos/")]+"Datos/"
 with open(data_path+'datos_ang_' + video_file_name + '.csv', 'wb') as h:
-    np.savetxt(h, V_ang_and_vel, delimiter=',', fmt='%0.3f', header="Ang (º),Vel (º/s),Time (s)")
+    np.savetxt(h, V_ang_and_vel, delimiter=',', fmt='%0.3f', header="Ang (°),Vel (°/s),Time (s)")
 
+
+#Calculo de la potencia muscular
+#time_stand_prom Tiempo promedio que se tarda en ir desde 90 grados a 180 grados (levantarse)
+#femur_lenght largo del femur [m]
+#time_stand_prom = time_stand # Para esta primer prueba será una toma simple, no promediada
+#femur_lenght = 0.4 # Estimada de momento
+#Pmean = 2.773 – 6.228 × time_stand_prom + 18.224 * femur_lenght
 
 # Datos del video resultado generado
 # FPS, resolution y factor de escala ya se determinaron/seteados antes
