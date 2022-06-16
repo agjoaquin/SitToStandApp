@@ -6,7 +6,7 @@ import mediapipe as mp
 import numpy as np
 from math import acos, degrees
 from tkinter import Tk     
-from tkinter.filedialog import askopenfilename
+from tkinter.filedialog import askdirectory, askopenfilename
 
 def filter_u_EMA(stack_ini, alfa):
     stack_filter = np.zeros(0)
@@ -25,8 +25,8 @@ def derivate_stack(stack_ini, delta_t):
             stack_der = np.append(stack_der,0)
         else:
             stack_der = np.append(stack_der,
-            (stack_ini[np.size(stack_der)-1] - stack_ini[np.size(stack_der)-2]) / delta_t) 
-        #print(str((stack_ini[np.size(stack_der)-1] - stack_ini[np.size(stack_der)-2] ) / delta_t))
+            (stack_ini[np.size(stack_der)] - stack_ini[np.size(stack_der)-1]) / delta_t) 
+
     return stack_der
 
 
@@ -71,7 +71,8 @@ print("\n-FPS_original:" + str(FPS_original) +
 # cv2.CAP_PROP_FRAME_COUNT   # 7
 
 # Nombre Y ruta del video generado para guardar como RESULTADO
-video_path_result = video_path + "Videos Resultados/"
+video_path = askdirectory()
+video_path_result = video_path + "/Videos/Videos Resultados/"
 video_file_result = video_path_result + video_file_name + "_resultado.mp4"
 
 # Datos para el video generado para guardar
@@ -205,16 +206,20 @@ with mp_pose.Pose(static_image_mode=False) as pose:
 
 V_angles_knee_filter = filter_u_EMA(V_angles_knee,alfa) #Filtro lo ang
 V_vel_angles_knee = derivate_stack(V_angles_knee_filter,delta_t) #Calculo la velocidad con el ang filtrado
-V_vel_angles_knee_filter = filter_u_EMA(V_vel_angles_knee,alfa) #Filtro la vel
+data = V_vel_angles_knee
+kernel_size = 20
+kernel = np.ones(kernel_size) / kernel_size
+V_vel_angles_knee_filter = np.convolve(data, kernel, mode='same')
+#V_vel_angles_knee_filter = filter_u_EMA(V_vel_angles_knee,alfa) #Filtro la vel
 print(np.size(V_time))
 print(np.size(V_angles_knee_filter))
 print(np.size(V_vel_angles_knee))
 #print(np.size(V_vel_angles_knee_filter))
 
-V_ang_and_vel = np.stack((V_angles_knee_filter[:-2], V_vel_angles_knee_filter[:-2], V_time[:-2]),1)
-data_path = video_path[0:len(video_path)-len("Videos/")]+"Datos/"
+V_ang_and_vel = np.stack(( V_time[:-2],V_angles_knee_filter[:-2], V_vel_angles_knee_filter[:-2]),1)
+data_path = video_path+"/Datos/"
 with open(data_path+'datos_ang_' + video_file_name + '.csv', 'wb') as h:
-    np.savetxt(h, V_ang_and_vel, delimiter=',', fmt='%0.3f', header="Ang (°),Vel (°/s),Time (s)")
+    np.savetxt(h, V_ang_and_vel, delimiter=',', fmt='%0.3f', header="Time (s),Ang (°),Vel (°/s)")
 
 
 #Calculo de la potencia muscular
