@@ -48,7 +48,7 @@ video_file_name = V_video_file[-1][0:len(V_video_file[-1])-len(V_video_file_name
 video_file_extension = V_video_file_name[-1]
 
 # Carga de archivo
-print( "Se analizará: " + video_file + " ...")
+#print( "Se analizará: " + video_file + " ...")
 cap = cv2.VideoCapture(video_file)
 
 # Datos del video cargado
@@ -60,10 +60,10 @@ width_original  = cap.get(cv2.CAP_PROP_FRAME_WIDTH)   # float "width"
 height_original = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)  # float "height"
 resolution_original =  (int(width_original), int(height_original))  #ej. (640, 480)
 #fourcc_original = cap.get(cv2.CAP_PROP_FOURCC) #No se utilizar esta funcion
-print("\n-FPS_original:" + str(FPS_original) + 
-    "\n-frame_count_original: " + str(frame_count) + 
-    "\n-duration_original:" + str(duration) + "s" 
-    + "\n-resolution_original: " + str(int(width_original)) + "x" + str(int(height_original)) + "\n")
+#print("\n-FPS_original:" + str(FPS_original) + 
+#    "\n-frame_count_original: " + str(frame_count) + 
+#    "\n-duration_original:" + str(duration) + "s" 
+#    + "\n-resolution_original: " + str(int(width_original)) + "x" + str(int(height_original)) + "\n")
 
 # cv2.CAP_PROP_FRAME_WIDTH   # 3
 # cv2.CAP_PROP_FRAME_HEIGHT  # 4
@@ -197,7 +197,7 @@ with mp_pose.Pose(static_image_mode=False) as pose:
             cv2.putText(loading_page, "Cargando: ", (10, height - 40), 4, 0.75, (20, 20, 20), 2) # Agrego info en el video
             cv2.putText(loading_page, "|", (int((frame_count_result/frame_count)*(width-10)), height - 10), 4, 0.75, (0, 100, 0), 2) # Agrego info en el video
             # Muestro pantalla de carga  
-            cv2.imshow("Frame", loading_page)  #Muestro video original reescalada
+            cv2.imshow("Cargando...", loading_page)  #Muestro video original reescalada
             if cv2.waitKey(1) & 0xFF == ord(' '):
                 break
 
@@ -211,23 +211,57 @@ kernel_size = 20
 kernel = np.ones(kernel_size) / kernel_size
 V_vel_angles_knee_filter = np.convolve(data, kernel, mode='same')
 #V_vel_angles_knee_filter = filter_u_EMA(V_vel_angles_knee,alfa) #Filtro la vel
-print(np.size(V_time))
-print(np.size(V_angles_knee_filter))
-print(np.size(V_vel_angles_knee))
-#print(np.size(V_vel_angles_knee_filter))
 
 V_ang_and_vel = np.stack(( V_time[:-2],V_angles_knee_filter[:-2], V_vel_angles_knee_filter[:-2]),1)
 data_path = video_path+"/Datos/"
 with open(data_path+'datos_ang_' + video_file_name + '.csv', 'wb') as h:
     np.savetxt(h, V_ang_and_vel, delimiter=',', fmt='%0.3f', header="Time (s),Ang (°),Vel (°/s)")
 
-
 #Calculo de la potencia muscular
-#time_stand_prom Tiempo promedio que se tarda en ir desde 90 grados a 180 grados (levantarse)
-#femur_lenght largo del femur [m]
-#time_stand_prom = time_stand # Para esta primer prueba será una toma simple, no promediada
-#femur_lenght = 0.4 # Estimada de momento
-#Pmean = 2.773 – 6.228 × time_stand_prom + 18.224 * femur_lenght
+
+#Calculo de el tiempo promedio sit to stand
+# Rangos: 
+# Angular inferior : 70 _ 95 
+# Angular superior : 165 _ 185
+# Velocidad: -0,5 _ 0,5
+p_inf = 0 #Indicador de punto inferior, bool que indica si el paciente está sentado
+p_sup = 0 #Indicador de punto superior, bool que indica si el paciente está parado
+t_inf = 0 #Tiempo en punto inferior, donde el paciente dejo de estar sentado
+t_sup = 0 #Tiempo en punto superior, donde el paciente llegó a estar parado
+V_t_dif = np.zeros(0) #Vector con diferenciales de tiempo
+count = 0 #Contador para iterar vectores
+while(np.size(V_time)>count):
+    #Hallo punto inferior
+    if (V_angles_knee_filter[count] > 70 and V_angles_knee_filter[count] < 95 and 
+    V_vel_angles_knee_filter[count] > -0.5 and V_vel_angles_knee_filter[count] < 0.5 and
+    p_sup == 0):
+        #print("Halle un punto inferiror") 
+        p_inf = 1
+        t_inf = V_time[count]
+    #Hallo punto superior #Mejorar
+    if (V_angles_knee_filter[count] > 165 and V_angles_knee_filter[count] < 185 and 
+    V_vel_angles_knee_filter[count] > -0.5 and V_vel_angles_knee_filter[count] < 0.5 and
+    p_inf == 1):
+        p_sup = 1
+        t_sup = V_time[count]
+    #Guardo el tiempo y lo agrego al vector
+    if (p_inf == 1 and p_sup == 1):
+        print("Tdif "+str(count)+": "+str(t_sup-t_inf))
+        V_t_dif = np.append(V_t_dif,t_sup-t_inf)
+        p_inf = 0
+        p_sup = 0
+        
+    count=count+1  
+#Falta optimización del ciclo
+
+# Tiempo promedio que se tarda en ir desde 90 grados a 180 grados (levantarse)
+t_dif_prom = np.mean(V_t_dif)
+print("El tiempo promedio es: "+str(t_dif_prom))
+
+femur_lenght = 0.45 #Largo del femur [m] Ahora estimación, luego calculada o ingresada como imput
+
+Pmean = 2.733 - 6.228 * t_dif_prom + 18.224 * femur_lenght
+
 
 # Datos del video resultado generado
 # FPS, resolution y factor de escala ya se determinaron/seteados antes
@@ -239,6 +273,8 @@ print("\n-FPS_result: " + str(FPS_result) +
     "\n-frame_count_result: " + str(frame_count_result) + 
     "\n-duration_result: " + str(duration_result))
 
+print("La potencia media es:"+str(Pmean))
+
 # RELEASE
 outVideoWriter.release()
 
@@ -248,7 +284,7 @@ while(video_out.isOpened()):
     ret, frame = video_out.read()
     if ret==True:
         
-        cv2.imshow('frame',frame)
+        cv2.imshow('Video procesado',frame)
 
         if cv2.waitKey(int(delta_t*1000)) & 0xFF == ord(' '):
             break
