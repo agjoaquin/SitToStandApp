@@ -7,37 +7,15 @@ import numpy as np
 from math import acos, degrees
 from tkinter import Tk     
 from tkinter.filedialog import askdirectory, askopenfilename
-
-def filter_u_EMA(stack_ini, alfa):
-    stack_filter = np.zeros(0)
-    while (np.size(stack_filter)<np.size(stack_ini)):
-        if(np.size(stack_filter)<2):
-            stack_filter = np.append(stack_filter,stack_ini[np.size(stack_filter)])
-        else:
-            stack_filter = np.append(stack_filter,
-            alfa * stack_ini[np.size(stack_filter)-1] + (1-alfa)*stack_filter[np.size(stack_filter)-2])
-    return stack_filter
-
-def derivate_stack(stack_ini, delta_t):
-    stack_der = np.zeros(0)
-    while (np.size(stack_der)<np.size(stack_ini)):
-        if(np.size(stack_der)<2):
-            stack_der = np.append(stack_der,0)
-        else:
-            stack_der = np.append(stack_der,
-            (stack_ini[np.size(stack_der)] - stack_ini[np.size(stack_der)-1]) / delta_t) 
-
-    return stack_der
-
-
+from pathlib import Path
+from Calculator import filter_u_EMA, derivate_stack
 
 mp_drawing = mp.solutions.drawing_utils
 mp_pose = mp.solutions.pose
 
-
 Tk().withdraw() # we don't want a full GUI, so keep the root window from appearing
-# Abro una ventana para seleccionar el archivo
-video_file = askopenfilename() # show an "Open" dialog box and return the path to the selected file
+# Abro una ventana para  seleccionar el archivo
+video_file = askopenfilename(title="Seleccione video a procesar") # show an "Open" dialog box and return the path to the selected file
 
 #Procesamiento de la dir del archivo para obtener datos como 
 #extensión de archivo, nombre de archivo y carpeta
@@ -71,7 +49,7 @@ resolution_original =  (int(width_original), int(height_original))  #ej. (640, 4
 # cv2.CAP_PROP_FRAME_COUNT   # 7
 
 # Nombre Y ruta del video generado para guardar como RESULTADO
-video_path = askdirectory()
+video_path = str(Path.cwd())
 video_path_result = video_path + "/Videos/Videos Resultados/"
 video_file_result = video_path_result + video_file_name + "_resultado.mp4"
 
@@ -152,40 +130,24 @@ with mp_pose.Pose(static_image_mode=False) as pose:
             
             V_angles_knee = np.append(V_angles_knee, angle)
 
-#            if (np.size(V_angles_knee)<=2):
-#                V_angles_knee_filter = np.append(V_angles_knee_filter, angle)
-
-#            vel_angles_knee = 0
-            # Calcular la velocidad angular y lo agrego a V_vel_angles_knee
-#            if (np.size(V_angles_knee) > 2):
-#                angles_count = np.size(V_angles_knee)
-#                V_angles_knee_filter = np.append(V_angles_knee_filter, 
-#                alfa * angle + (1-alfa)* V_angles_knee_filter[angles_count-2])
-
-#                vel_angles_knee = ( V_angles_knee[angles_count-1] - V_angles_knee[angles_count-2] ) / delta_t
-#                V_vel_angles_knee = np.append(V_vel_angles_knee, vel_angles_knee)
-#                if(np.size(V_vel_angles_knee_filter)<2):
-#                    V_vel_angles_knee_filter = np.append(V_vel_angles_knee_filter, 19)
-#                else:
-#                    V_vel_angles_knee_filter = np.append(V_vel_angles_knee_filter, 
-#                    alfa * vel_angles_knee + (1-alfa)* V_vel_angles_knee_filter[np.size(V_vel_angles_knee_filter)-2])
                
             # Visualización de segmentos de muslo y pierna
             aux_image = np.zeros(resized_frame.shape, np.uint8)
 
-            cv2.line(aux_image, (x1, y1), (x2, y2), (100, 255, 0), 20)
-            cv2.line(aux_image, (x2, y2), (x3, y3), (100, 255, 0), 28)
-            cv2.line(aux_image, (x1, y1), (x3, y3), (100, 255, 0), 5)
+            cv2.line(aux_image, (x1, y1), (x2, y2), (3, 202, 251), 20)
+            cv2.line(aux_image, (x2, y2), (x3, y3), (3, 202, 251), 20)
+            
             contours = np.array([[x1, y1], [x2, y2], [x3, y3]])
-            cv2.fillPoly(aux_image, pts=[contours], color=(128, 200, 250))
+            
+            
+            #Output es el frame ya procesado
+            output = cv2.addWeighted(resized_frame, 1, aux_image, 0.8, 0)   
 
-            output = cv2.addWeighted(resized_frame, 1, aux_image, 0.8, 0)   #output es el frame ya procesado
+            cv2.circle(output, (x1, y1), 6, (5,5,170), 4)
+            cv2.circle(output, (x2, y2), 6, (5,5,170), 4)
+            cv2.circle(output, (x3, y3), 6, (5,5,170), 4)
 
-            cv2.circle(output, (x1, y1), 6, (0, 255, 255), 4)
-            cv2.circle(output, (x2, y2), 6, (128, 0, 255), 4)
-            cv2.circle(output, (x3, y3), 6, (255, 191, 0), 4)
-
-            cv2.putText(output, str(int(angle)), (x2, y2 - 30), 1, 1.5, (128, 0, 250), 2)   # Agrego el angulo en el video
+            cv2.putText(output, str(int(angle)), (x2, y2 - 30), 1, 1.5, (5,5,170), 2)   # Agrego el angulo en el video
             cv2.putText(output, "Angulo en grados,", (10, height - 40), 4, 0.75, (20, 20, 20), 2) # Agrego info en el video
             cv2.putText(output, "Pulse ESPACIO para finalizar.", (10, height - 10), 4, 0.75, (20, 20, 20), 2) # Agrego info en el video
             #cv2.putText(output, "Velocidad : "+str(round(vel_angles_knee,2)) + " grad/s", (10, height - 70), 4, 0.75, (20, 20, 20), 2) # Agrego info en el video
