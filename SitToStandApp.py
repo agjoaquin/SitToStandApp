@@ -82,18 +82,17 @@ with mp_pose.Pose(static_image_mode=False) as pose:
                 
         if ret == False:
             break      
-        # np.append(V_time, round(cap.get(cv2.CAP_PROP_POS_MSEC)/1000, 4))
-        # #print(round(cap.get(cv2.CAP_PROP_POS_MSEC)/1000, 4)
+        
         V_time= np.append(V_time, frame_count_result/FPS_result)
         frame_count_result = frame_count_result + 1
      
         # Reescalado de la imagen/imagenes del video
-        # scale_percent = 50  # --> Definido arriba para determinar la escritura del video resultado
         width = int(frame.shape[1] * scale_percent / 100)   # Otra opcion: height, width, layers = frame.shape
         height = int(frame.shape[0] * scale_percent / 100)
         dim = (width, height)
 
-        resized_frame = cv2.resize(frame, dim, interpolation= cv2.INTER_AREA)   # resized_frame será el nuevo "frame" que se trabaja
+        resized_frame = cv2.resize(frame, dim, interpolation= cv2.INTER_AREA)   
+        # resized_frame será el nuevo "frame" que se trabaja
         
         #Utilizo el primer frame como pantalla de carga
         if (frame_count_result == 1):
@@ -116,7 +115,7 @@ with mp_pose.Pose(static_image_mode=False) as pose:
             x3 = int(results.pose_landmarks.landmark[28].x * width)
             y3 = int(results.pose_landmarks.landmark[28].y * height)
 
-            # Calculo de angulo:
+            # Calculo de ángulo:
             p1 = np.array([x1, y1])
             p2 = np.array([x2, y2])
             p3 = np.array([x3, y3])
@@ -127,9 +126,7 @@ with mp_pose.Pose(static_image_mode=False) as pose:
 
             # Calcular el ángulo (teorema del coseno) y lo agrego a V_angles_knee
             angle = degrees(acos((l1**2 + l3**2 - l2**2) / (2 * l1 * l3)))
-            
             V_angles_knee = np.append(V_angles_knee, angle)
-
                
             # Visualización de segmentos de muslo y pierna
             aux_image = np.zeros(resized_frame.shape, np.uint8)
@@ -139,40 +136,44 @@ with mp_pose.Pose(static_image_mode=False) as pose:
             
             contours = np.array([[x1, y1], [x2, y2], [x3, y3]])
             
-            
             #Output es el frame ya procesado
             output = cv2.addWeighted(resized_frame, 1, aux_image, 0.8, 0)   
-
+            
+            #Grafico landmarks con circulos
             cv2.circle(output, (x1, y1), 6, (5,5,170), 4)
             cv2.circle(output, (x2, y2), 6, (5,5,170), 4)
             cv2.circle(output, (x3, y3), 6, (5,5,170), 4)
-
-            cv2.putText(output, str(int(angle)), (x2, y2 - 30), 1, 1.5, (5,5,170), 2)   # Agrego el angulo en el video
-            cv2.putText(output, "Angulo en grados,", (10, height - 40), 4, 0.75, (20, 20, 20), 2) # Agrego info en el video
-            cv2.putText(output, "Pulse ESPACIO para finalizar.", (10, height - 10), 4, 0.75, (20, 20, 20), 2) # Agrego info en el video
-            #cv2.putText(output, "Velocidad : "+str(round(vel_angles_knee,2)) + " grad/s", (10, height - 70), 4, 0.75, (20, 20, 20), 2) # Agrego info en el video
             
-            # Guardado del video resultante
+            # Agrego el angulo en el video
+            cv2.putText(output, str(int(angle)), (x2, y2 - 30), 1, 1.5, (5,5,170), 2)   
+            # Agrego info en el video
+            cv2.putText(output, "Angulo en grados,", (10, height - 40), 4, 0.75, (20, 20, 20), 2) 
+            cv2.putText(output, "Pulse ESPACIO para finalizar.", (10, height - 10), 4, 0.75, (20, 20, 20), 2) 
+            
+
+            # Guardado del frame del video resultante
             outVideoWriter.write(output)
             
             #Pantalla de carga
-            cv2.putText(loading_page, "Cargando: ", (10, height - 40), 4, 0.75, (20, 20, 20), 2) # Agrego info en el video
-            cv2.putText(loading_page, "|", (int((frame_count_result/frame_count)*(width-10)), height - 10), 4, 0.75, (0, 100, 0), 2) # Agrego info en el video
+            cv2.putText(loading_page, "Cargando: ", (10, height - 40), 4, 0.75, (20, 20, 20), 2) 
+            #Barra de carga
+            cv2.putText(loading_page, "|", (int((frame_count_result/frame_count)*(width-10)), height - 10), 4, 0.75, (0, 100, 0), 2) 
             # Muestro pantalla de carga  
-            cv2.imshow("Cargando...", loading_page)  #Muestro video original reescalada
+            cv2.imshow("Cargando...", loading_page) 
+            #Condicional para "Pulse espacio para terminar"
             if cv2.waitKey(1) & 0xFF == ord(' '):
                 break
 
 
 # Guardo los angulos medidos
-
-V_angles_knee_filter = filter_u_EMA(V_angles_knee,alfa) #Filtro lo ang
-V_vel_angles_knee = derivate_stack(V_angles_knee_filter,delta_t) #Calculo la velocidad con el ang filtrado
-data = V_vel_angles_knee
+#Filtro los angulos
+V_angles_knee_filter = filter_u_EMA(V_angles_knee,alfa) 
+#Calculo la velocidad con el ang filtrado
+V_vel_angles_knee = derivate_stack(V_angles_knee_filter,delta_t) 
+#Filtro la velocidad
 kernel_size = 20
 kernel = np.ones(kernel_size) / kernel_size
-V_vel_angles_knee_filter = np.convolve(data, kernel, mode='same')
-#V_vel_angles_knee_filter = filter_u_EMA(V_vel_angles_knee,alfa) #Filtro la vel
+V_vel_angles_knee_filter = np.convolve(V_vel_angles_knee, kernel, mode='same')
 
 V_ang_and_vel = np.stack(( V_time[:-2],V_angles_knee_filter[:-2], V_vel_angles_knee_filter[:-2]),1)
 data_path = video_path+"/Datos/"
@@ -183,15 +184,22 @@ with open(data_path+'datos_ang_' + video_file_name + '.csv', 'wb') as h:
 
 #Calculo de el tiempo promedio sit to stand
 # Rangos: 
-# Angular inferior : 70 _ 95 
-# Angular superior : 165 _ 185
-# Velocidad: -0,5 _ 0,5
-p_inf = 0 #Indicador de punto inferior, bool que indica si el paciente está sentado
-p_sup = 0 #Indicador de punto superior, bool que indica si el paciente está parado
-t_inf = 0 #Tiempo en punto inferior, donde el paciente dejo de estar sentado
-t_sup = 0 #Tiempo en punto superior, donde el paciente llegó a estar parado
-V_t_dif = np.zeros(0) #Vector con diferenciales de tiempo
-count = 0 #Contador para iterar vectores
+#   Angular inferior : 70 _ 95 
+#   Angular superior : 165 _ 185
+#   Velocidad: -0,5 _ 0,5
+
+#Indicador de punto inferior, bool que indica si el paciente está sentado
+p_inf = 0 
+#Indicador de punto superior, bool que indica si el paciente está parado
+p_sup = 0 
+#Tiempo en punto inferior, donde el paciente dejo de estar sentado
+t_inf = 0 
+#Tiempo en punto superior, donde el paciente llegó a estar parado
+t_sup = 0 
+#Vector con diferenciales de tiempo
+V_t_dif = np.zeros(0) 
+#Contador para iterar vectores
+count = 0 
 while(np.size(V_time)>count):
     #Hallo punto inferior
     if (V_angles_knee_filter[count] > 70 and V_angles_knee_filter[count] < 95 and 
@@ -214,16 +222,16 @@ while(np.size(V_time)>count):
         p_sup = 0
         
     count=count+1  
-#Falta optimización del ciclo
 
 # Tiempo promedio que se tarda en ir desde 90 grados a 180 grados (levantarse)
 t_dif_prom = np.mean(V_t_dif)
 print("El tiempo promedio es: "+str(t_dif_prom))
 
-femur_lenght = 0.45 #Largo del femur [m] Ahora estimación, luego calculada o ingresada como imput
+#Largo del femur [m] Ahora estimación, luego calculada o ingresada como input
+femur_lenght = 0.45 
 
+#Potencia media
 Pmean = 2.733 - 6.228 * t_dif_prom + 18.224 * femur_lenght
-
 
 # Datos del video resultado generado
 # FPS, resolution y factor de escala ya se determinaron/seteados antes
