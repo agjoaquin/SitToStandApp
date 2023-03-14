@@ -9,6 +9,7 @@ from tkinter import Tk
 from tkinter.filedialog import askdirectory, askopenfilename
 from pathlib import Path
 from Calculator import filter_u_EMA, derivate_stack
+import matplotlib.pyplot as plt
 
 mp_drawing = mp.solutions.drawing_utils
 mp_pose = mp.solutions.pose
@@ -30,7 +31,7 @@ video_file_extension = V_video_file_name[-1]
 cap = cv2.VideoCapture(video_file)
 
 # Datos del video cargado
-FPS_original = cap.get(5)  #ej. 25.0 
+FPS_original = cap.get(cv2.CAP_PROP_FPS)   #ej. 25.0 
 frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 duration = frame_count/FPS_original
 delta_t = 1/FPS_original
@@ -68,6 +69,7 @@ outVideoWriter = cv2.VideoWriter(video_file_result, fourcc, FPS_result, resoluti
 
 # Vector de angulos de la rodilla (knee)
 V_angles_knee = np.zeros(0)
+V_angles_knee2 = np.zeros(0)
 V_vel_angles_knee = np.zeros(0)
 #V_angles_knee_filter = np.zeros(0)
 #V_vel_angles_knee_filter = np.zeros(0)
@@ -76,7 +78,7 @@ alfa = 0.1
 V_time = np.zeros(0)
 
 # Inicio de While True para reproduccion y analisis
-with mp_pose.Pose(static_image_mode=False) as pose:
+with mp_pose.Pose(static_image_mode=False, model_complexity=2) as pose:
     while True:
         ret, frame = cap.read()
                 
@@ -85,7 +87,7 @@ with mp_pose.Pose(static_image_mode=False) as pose:
         
         V_time= np.append(V_time, frame_count_result/FPS_result)
         frame_count_result = frame_count_result + 1
-     
+    
         # Reescalado de la imagen/imagenes del video
         width = int(frame.shape[1] * scale_percent / 100)   # Otra opcion: height, width, layers = frame.shape
         height = int(frame.shape[0] * scale_percent / 100)
@@ -115,6 +117,35 @@ with mp_pose.Pose(static_image_mode=False) as pose:
             x3 = int(results.pose_landmarks.landmark[28].x * width)
             y3 = int(results.pose_landmarks.landmark[28].y * height)
 
+            x4 = int(results.pose_landmarks.landmark[30].x * width)
+            y4 = int(results.pose_landmarks.landmark[30].y * height)
+
+            x5 = int(results.pose_landmarks.landmark[32].x * width)
+            y5 = int(results.pose_landmarks.landmark[32].y * height)
+
+            x6 = int(results.pose_landmarks.landmark[12].x * width)
+            y6 = int(results.pose_landmarks.landmark[12].y * height)
+
+            x11 = int(results.pose_landmarks.landmark[23].x * width)
+            y11 = int(results.pose_landmarks.landmark[23].y * height)
+
+            # Landmark 26
+            x22 = int(results.pose_landmarks.landmark[25].x * width)
+            y22 = int(results.pose_landmarks.landmark[25].y * height)
+
+            # Landmark 28
+            x33 = int(results.pose_landmarks.landmark[27].x * width)
+            y33 = int(results.pose_landmarks.landmark[27].y * height)
+
+            x44 = int(results.pose_landmarks.landmark[29].x * width)
+            y44 = int(results.pose_landmarks.landmark[29].y * height)
+
+            x55 = int(results.pose_landmarks.landmark[31].x * width)
+            y55 = int(results.pose_landmarks.landmark[31].y * height)
+
+            x66 = int(results.pose_landmarks.landmark[11].x * width)
+            y66 = int(results.pose_landmarks.landmark[11].y * height)
+
             # Calculo de ángulo:
             p1 = np.array([x1, y1])
             p2 = np.array([x2, y2])
@@ -124,16 +155,45 @@ with mp_pose.Pose(static_image_mode=False) as pose:
             l2 = np.linalg.norm(p1 - p3)
             l3 = np.linalg.norm(p1 - p2)
 
+            # Calculo de ángulo:
+            p11 = np.array([x11, y11])
+            p22 = np.array([x22, y22])
+            p33 = np.array([x33, y33])
+
+            l11 = np.linalg.norm(p22 - p33)
+            l22 = np.linalg.norm(p11 - p33)
+            l33 = np.linalg.norm(p11 - p22)
+
             # Calcular el ángulo (teorema del coseno) y lo agrego a V_angles_knee
             angle = degrees(acos((l1**2 + l3**2 - l2**2) / (2 * l1 * l3)))
             V_angles_knee = np.append(V_angles_knee, angle)
-               
+
+            # Calcular el ángulo (teorema del coseno) y lo agrego a V_angles_knee
+            angle2 = degrees(acos((l11**2 + l33**2 - l22**2) / (2 * l11 * l33)))
+            V_angles_knee2 = np.append(V_angles_knee2, angle2)
+        
             # Visualización de segmentos de muslo y pierna
             aux_image = np.zeros(resized_frame.shape, np.uint8)
 
+            #Rigth leg
             cv2.line(aux_image, (x1, y1), (x2, y2), (3, 202, 251), 20)
             cv2.line(aux_image, (x2, y2), (x3, y3), (3, 202, 251), 20)
-            
+            cv2.line(aux_image, (x3, y3), (x4, y4), (3, 202, 251), 20)
+            cv2.line(aux_image, (x4, y4), (x5, y5), (3, 202, 251), 20)
+            #Left leg
+            cv2.line(aux_image, (x11, y11), (x22, y22), (3, 202, 251), 20)
+            cv2.line(aux_image, (x22, y22), (x33, y33), (3, 202, 251), 20)
+            cv2.line(aux_image, (x33, y33), (x44, y44), (3, 202, 251), 20)
+            cv2.line(aux_image, (x44, y44), (x55, y55), (3, 202, 251), 20)
+            #Hip
+            #cv2.line(aux_image, (x1, y1), (x11, y11), (3, 202, 251), 20)
+            #Shoulders
+            #cv2.line(aux_image, (x6, y6), (x66, y66), (3, 202, 251), 20)
+            #Torax
+            #cv2.line(aux_image, (x1, y1), (x6, y6), (3, 202, 251), 20)
+            #cv2.line(aux_image, (x11, y11), (x66, y66), (3, 202, 251), 20)
+
+
             contours = np.array([[x1, y1], [x2, y2], [x3, y3]])
             
             #Output es el frame ya procesado
@@ -143,12 +203,17 @@ with mp_pose.Pose(static_image_mode=False) as pose:
             cv2.circle(output, (x1, y1), 6, (5,5,170), 4)
             cv2.circle(output, (x2, y2), 6, (5,5,170), 4)
             cv2.circle(output, (x3, y3), 6, (5,5,170), 4)
+
+            cv2.circle(output, (x11, y11), 6, (5,5,170), 4)
+            cv2.circle(output, (x22, y22), 6, (5,5,170), 4)
+            cv2.circle(output, (x33, y33), 6, (5,5,170), 4)
             
             # Agrego el angulo en el video
             cv2.putText(output, str(int(angle)), (x2, y2 - 30), 1, 1.5, (5,5,170), 2)   
             # Agrego info en el video
             cv2.putText(output, "Angulo en grados,", (10, height - 40), 4, 0.75, (20, 20, 20), 2) 
-            cv2.putText(output, "Pulse ESPACIO para finalizar.", (10, height - 10), 4, 0.75, (20, 20, 20), 2) 
+            
+            #cv2.putText(output, "Pulse ESPACIO para finalizar.", (10, height - 10), 4, 0.75, (20, 20, 20), 2) 
             
 
             # Guardado del frame del video resultante
@@ -163,11 +228,14 @@ with mp_pose.Pose(static_image_mode=False) as pose:
             #Condicional para "Pulse espacio para terminar"
             if cv2.waitKey(1) & 0xFF == ord(' '):
                 break
+        else:
+            print("Skipped frame"+str(frame_count_result))
 
 
 # Guardo los angulos medidos
 #Filtro los angulos
 V_angles_knee_filter = filter_u_EMA(V_angles_knee,alfa) 
+V_angles_knee_filter2 = filter_u_EMA(V_angles_knee2,alfa) 
 #Calculo la velocidad con el ang filtrado
 V_vel_angles_knee = derivate_stack(V_angles_knee_filter,delta_t) 
 #Filtro la velocidad
@@ -175,17 +243,34 @@ kernel_size = 20
 kernel = np.ones(kernel_size) / kernel_size
 V_vel_angles_knee_filter = np.convolve(V_vel_angles_knee, kernel, mode='same')
 
+delta_t
+print("FPS_original: "+str(FPS_original))
+print("delta_t: "+str(delta_t))
+print("V_angles_knee: "+str(V_angles_knee.size))
+print("V_time: "+str(V_time.size))
+print("V_angles_knee_filter : "+str(V_angles_knee_filter.size))
+print("V_vel_angles_knee_filter : "+str(V_vel_angles_knee_filter.size))
+
 V_ang_and_vel = np.stack(( V_time[:-2],V_angles_knee_filter[:-2], V_vel_angles_knee_filter[:-2]),1)
 data_path = video_path+"/Datos/"
 with open(data_path+'datos_ang_' + video_file_name + '.csv', 'wb') as h:
     np.savetxt(h, V_ang_and_vel, delimiter=',', fmt='%0.3f', header="Time (s),Ang (°),Vel (°/s)")
 
+
+plt.plot(V_time, V_angles_knee_filter)
+plt.plot(V_time, V_angles_knee_filter2)
+plt.xlabel("Tiempo")
+plt.ylabel("Ángulo")
+plt.title("Ángulos de ambas rodillas.")
+plt.legend(['Rodilla derecha','Rodilla Izquierda'])
+plt.show()
+
 #Calculo de la potencia muscular
 
 #Calculo de el tiempo promedio sit to stand
-# Rangos: 
-#   Angular inferior : 70 _ 95 
-#   Angular superior : 165 _ 185
+# Rangos: //Varian según perspectiva de grabado
+#   Angular inferior : 70 _ 110 
+#   Angular superior : 135 _ 185
 #   Velocidad: -0,5 _ 0,5
 
 #Indicador de punto inferior, bool que indica si el paciente está sentado
@@ -202,14 +287,14 @@ V_t_dif = np.zeros(0)
 count = 0 
 while(np.size(V_time)>count):
     #Hallo punto inferior
-    if (V_angles_knee_filter[count] > 70 and V_angles_knee_filter[count] < 95 and 
+    if (V_angles_knee_filter[count] > 70 and V_angles_knee_filter[count] < 110 and 
     V_vel_angles_knee_filter[count] > -0.5 and V_vel_angles_knee_filter[count] < 0.5 and
     p_sup == 0):
         #print("Halle un punto inferiror") 
         p_inf = 1
         t_inf = V_time[count]
     #Hallo punto superior #Mejorar
-    if (V_angles_knee_filter[count] > 165 and V_angles_knee_filter[count] < 185 and 
+    if (V_angles_knee_filter[count] > 135 and V_angles_knee_filter[count] < 185 and 
     V_vel_angles_knee_filter[count] > -0.5 and V_vel_angles_knee_filter[count] < 0.5 and
     p_inf == 1):
         p_sup = 1
@@ -228,7 +313,7 @@ t_dif_prom = np.mean(V_t_dif)
 print("El tiempo promedio es: "+str(t_dif_prom))
 
 #Largo del femur [m] Ahora estimación, luego calculada o ingresada como input
-femur_lenght = 0.45 
+femur_lenght = 0.45
 
 #Potencia media
 Pmean = 2.733 - 6.228 * t_dif_prom + 18.224 * femur_lenght
@@ -254,6 +339,7 @@ while(video_out.isOpened()):
     ret, frame = video_out.read()
     if ret==True:
         
+        cv2.putText(frame, "La p.m.m. final es: "+str(Pmean), (10, height - 10), 4, 0.75, (20, 20, 20), 2) 
         cv2.imshow('Video procesado',frame)
 
         if cv2.waitKey(int(delta_t*1000)) & 0xFF == ord(' '):
